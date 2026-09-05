@@ -41,6 +41,8 @@ html, body {
   overscroll-behavior-y: none;
 }
 
+html { min-width: 320px; }
+
 body {
   min-height: 100vh;
   padding-bottom: env(safe-area-inset-bottom);
@@ -65,8 +67,32 @@ button, input, select, textarea {
   background: var(--cream-dim);
 }
 
-.screen { display: none; padding: 0 clamp(16px, 3vw, 48px) 24px; }
-.screen.is-active { display: block; }
+.screen {
+  display: none;
+  width: 100%;
+  padding: 0 clamp(12px, 3vw, 48px) 24px;
+}
+.screen.is-active {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 0;
+}
+.screen > * { min-width: 0; }
+.screen > .arch-header,
+.screen > .banner,
+.screen > .card,
+.screen > .section-title,
+.screen > .quick-actions,
+.screen > .tt-list,
+.screen > .bell-list,
+.screen > .ring-list,
+.screen > .empty-state,
+.screen > .empty-state--big,
+.screen > .about-block,
+.screen > .btn--block {
+  grid-column: 1 / -1;
+}
 
 /* ---------------------------- arch header ---------------------------- */
 
@@ -116,6 +142,7 @@ button, input, select, textarea {
   box-shadow: var(--shadow-card);
   padding: 16px;
   margin-bottom: 14px;
+  min-width: 0;
 }
 .card--hero { background: linear-gradient(180deg, #fff 0%, var(--emerald-soft) 130%); }
 .card--danger { border-top-color: var(--maroon); }
@@ -235,13 +262,14 @@ button, input, select, textarea {
 
 .override-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
 .override-row label { font-size: 13px; color: var(--ink-soft); }
-.override-row select { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--cream); flex: 1; max-width: 62%; }
+.override-row select { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--cream); flex: 1; min-width: 0; max-width: 62%; }
 
 .bell-list { display: flex; flex-direction: column; gap: 8px; }
 .bell-row {
   display: flex; align-items: center; gap: 10px;
   background: #fff; border-radius: 14px; padding: 10px 12px;
   box-shadow: var(--shadow-card);
+  min-width: 0;
 }
 .bell-row.is-disabled { opacity: 0.5; }
 .bell-row__time { font-family: var(--font-display); font-size: 15px; width: 78px; color: var(--emerald-dark); }
@@ -268,7 +296,7 @@ button, input, select, textarea {
 
 /* ---------------------------- Timetables tab ---------------------------- */
 
-.tt-list { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.tt-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 14px; }
 .tt-assignment { font-size: 12.5px; color: var(--ink-soft); margin-top: 6px; }
 .tt-order-btns { display: flex; flex-direction: column; gap: 4px; }
 .tt-bell-count { font-size: 12px; color: var(--ink-soft); margin-top: 10px; }
@@ -357,18 +385,20 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
 
 /* ---------------------------- Rings tab ---------------------------- */
 
-.ring-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.ring-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 6px; }
 .ring-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: #fff; border-radius: 14px; padding: 10px 14px;
   box-shadow: var(--shadow-card);
+  min-width: 0;
 }
 .ring-row__name { font-weight: 600; font-size: 14px; }
-.ring-row__actions { display: flex; gap: 6px; }
+.ring-row__name { min-width: 0; overflow-wrap: anywhere; }
+.ring-row__actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
 /* ---------------------------- Settings tab ---------------------------- */
 
-.import-btn-row { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.import-btn-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-top: 8px; }
 .about-block { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 24px; padding-bottom: 10px; }
 
 /* ---------------------------- bottom tab bar ---------------------------- */
@@ -428,31 +458,13 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
   }
 
   .screen {
-    display: none;
     padding-top: clamp(12px, 2.5vh, 32px);
   }
 
   .screen.is-active {
-    display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
     column-gap: clamp(16px, 2vw, 32px);
     row-gap: 0;
-  }
-
-  .screen > .arch-header,
-  .screen > .section-title,
-  .screen > .banner,
-  .screen > .bell-list,
-  .screen > .log-list,
-  .screen > .empty-state,
-  .screen > .empty-state--big,
-  .screen > .about-block {
-    grid-column: 1 / -1;
-  }
-
-  .screen > .card {
-    width: 100%;
   }
 
   .arch-header {
@@ -461,6 +473,22 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
 
   .card {
     margin-bottom: 16px;
+  }
+
+  #screen-settings > .card,
+  #screen-rings > .card {
+    grid-column: span 1;
+  }
+
+  .tt-list,
+  .ring-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(16px, 2vw, 32px);
+  }
+
+  .tt-list .card,
+  .ring-list .ring-row {
+    margin-bottom: 0;
   }
 
   .modal-overlay {
@@ -481,16 +509,23 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
     column-gap: clamp(20px, 2.5vw, 40px);
   }
 
-  .screen > .arch-header,
-  .screen > .section-title,
-  .screen > .banner,
-  .screen > .bell-list,
-  .screen > .log-list,
-  .screen > .empty-state,
-  .screen > .empty-state--big,
-  .screen > .about-block {
-    grid-column: 1 / -1;
+  .tt-list,
+  .ring-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: clamp(20px, 2.5vw, 40px);
   }
+}
+
+@media (max-width: 699px) and (orientation: landscape) {
+  #app-shell { padding-bottom: 78px; }
+
+  .screen { padding-top: 10px; }
+  .arch-header { margin-bottom: 14px; }
+  .clock { font-size: 32px; padding-top: 10px; }
+  .clock-date { font-size: 12px; }
+  .tabbar { padding-top: 4px; }
+  .tabbar__btn { padding-top: 4px; padding-bottom: 4px; }
+  .tabbar__btn .tabbar__icon { font-size: 17px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
