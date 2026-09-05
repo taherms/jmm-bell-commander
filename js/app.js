@@ -29,6 +29,7 @@ const Store = (() => {
     try {
       return { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
     } catch { return { ...DEFAULT_SETTINGS }; }
+  }
   function setSettings(s) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
   }
