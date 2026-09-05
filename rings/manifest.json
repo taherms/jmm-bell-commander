@@ -1,0 +1,9 @@
+{
+  "rings": [
+    {
+      "id": "bell-classic",
+      "name": "Classic Bell",
+      "file": "bell-classic.wav"
+    }
+  ]
+}
