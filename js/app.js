@@ -891,7 +891,8 @@ function startScheduler() {
       // Re-render the whole Now screen each second: it's a small DOM tree,
       // and this keeps the active timetable, next-bell countdown and each
       // bell's Rung/Pending status correct without extra bookkeeping.
-      if (AppState.activeTab === 'now') renderNow();
+      // Keep the timetable selector stable while it is being used.
+      if (AppState.activeTab === 'now' && document.activeElement?.id !== 'override-select') renderNow();
     },
     onBellFire: (bell, timetable) => {
       AppState.firedTodaySet.add(`${Utils.dateToYMD(new Date())}_${bell.id}`);
