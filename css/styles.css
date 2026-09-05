@@ -56,7 +56,8 @@ button, input, select, textarea {
 /* ---------------------------- app shell layout ---------------------------- */
 
 #app-shell {
-  max-width: 480px;
+  width: 100%;
+  max-width: 1440px;
   margin: 0 auto;
   min-height: 100vh;
   position: relative;
@@ -64,7 +65,7 @@ button, input, select, textarea {
   background: var(--cream-dim);
 }
 
-.screen { display: none; padding: 0 16px 24px; }
+.screen { display: none; padding: 0 clamp(16px, 3vw, 48px) 24px; }
 .screen.is-active { display: block; }
 
 /* ---------------------------- arch header ---------------------------- */
@@ -182,7 +183,7 @@ button, input, select, textarea {
 }
 .btn--gold { background: var(--gold); color: var(--ink); }
 .btn--outline { background: #fff; border: 1.5px solid var(--emerald); color: var(--emerald-dark); }
-.btn--danger.btn--outline { border-color: var(--maroon); color: var(--maroon); }
+.btn--danger.btn--outline { border-color: var(--maroon);}
 .btn--danger { background: var(--maroon); color: #fff; }
 .btn--block { display: block; width: 100%; margin-top: 10px; }
 .btn--sm { padding: 7px 12px; font-size: 13px; }
@@ -374,7 +375,7 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
 
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0;
-  max-width: 480px; margin: 0 auto;
+  width: min(100%, 1440px); margin: 0 auto;
   background: var(--cream);
   border-top: 1px solid var(--line);
   display: flex;
@@ -415,6 +416,82 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
 /* ---------------------------- misc ---------------------------- */
 
 .check-row code, .hint-text code { background: var(--cream-dim); padding: 1px 5px; border-radius: 4px; }
+
+@media (min-width: 700px) {
+  body {
+    min-height: 100dvh;
+  }
+
+  #app-shell {
+    min-height: 100dvh;
+    padding-bottom: 104px;
+  }
+
+  .screen {
+    display: none;
+    padding-top: clamp(12px, 2.5vh, 32px);
+  }
+
+  .screen.is-active {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    column-gap: clamp(16px, 2vw, 32px);
+    row-gap: 0;
+  }
+
+  .screen > .arch-header,
+  .screen > .section-title,
+  .screen > .banner,
+  .screen > .bell-list,
+  .screen > .log-list,
+  .screen > .empty-state,
+  .screen > .empty-state--big,
+  .screen > .about-block {
+    grid-column: 1 / -1;
+  }
+
+  .screen > .card {
+    width: 100%;
+  }
+
+  .arch-header {
+    margin-bottom: clamp(18px, 2.5vh, 30px);
+  }
+
+  .card {
+    margin-bottom: 16px;
+  }
+
+  .modal-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .modal {
+    max-width: 680px;
+    max-height: min(88dvh, 820px);
+    border-radius: 24px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .screen.is-active {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    column-gap: clamp(20px, 2.5vw, 40px);
+  }
+
+  .screen > .arch-header,
+  .screen > .section-title,
+  .screen > .banner,
+  .screen > .bell-list,
+  .screen > .log-list,
+  .screen > .empty-state,
+  .screen > .empty-state--big,
+  .screen > .about-block {
+    grid-column: 1 / -1;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
