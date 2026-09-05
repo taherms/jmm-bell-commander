@@ -29,12 +29,14 @@ const Store = (() => {
     try {
       return { ...DEFAULT_SETTINGS, ...(JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}) };
     } catch { return { ...DEFAULT_SETTINGS }; }
-  }
   function setSettings(s) {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
   }
+  function hasSavedData() {
+    return localStorage.getItem(TT_KEY) !== null || localStorage.getItem(SETTINGS_KEY) !== null;
+  }
 
-  return { getTimetables, setTimetables, getSettings, setSettings, DEFAULT_SETTINGS };
+  return { getTimetables, setTimetables, getSettings, setSettings, hasSavedData, DEFAULT_SETTINGS };
 })();
 
 /* ------------------------------ app state ------------------------------ */
@@ -880,6 +882,34 @@ async function loadCustomRingsMeta() {
   AppState.customRings = all.map((r) => ({ id: r.id, name: r.name, mimeType: r.mimeType, createdAt: r.createdAt }));
 }
 
+async function loadInitialSetup() {
+  if (Store.hasSavedData()) return;
+
+  try {
+    const res = await fetch('seed/jmm-bell-commander-backup-2026-09-05-2.json');
+    if (!res.ok) throw new Error(`Seed setup request failed: ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data.timetables)) throw new Error('Seed setup has no timetables');
+
+    AppState.timetables = data.timetables;
+    AppState.settings = { ...Store.DEFAULT_SETTINGS, ...(data.settings || {}) };
+    persistTimetables();
+    persistSettings();
+
+    for (const ring of (data.customRings || [])) {
+      await RingsDB.put({
+        id: ring.id,
+        name: ring.name,
+        mimeType: ring.mimeType,
+        blob: await Utils.dataURLToBlob(ring.dataUrl),
+        createdAt: Date.now(),
+      });
+    }
+  } catch (err) {
+    console.error('Could not load first-run setup', err);
+  }
+}
+
 function startScheduler() {
   Scheduler.setVolume(AppState.settings.volume);
   Scheduler.start({
@@ -917,6 +947,7 @@ function startScheduler() {
 
 async function boot() {
   await initAuthGate();
+  await loadInitialSetup();
   await loadDefaultRings();
   await loadCustomRingsMeta();
   if (AppState.settings.wakeLockPreferred) requestWakeLock();

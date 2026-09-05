@@ -19,6 +19,7 @@ const APP_SHELL = [
   './js/app.js',
   './rings/manifest.json',
   './rings/bell-classic.wav',
+  './seed/jmm-bell-commander-backup-2026-09-05-2.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
