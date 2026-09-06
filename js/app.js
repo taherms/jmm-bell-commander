@@ -54,10 +54,25 @@ const AppState = {
   audioBlockedBanner: false,
   wakeLockObj: null,
   currentTickInfo: null,
+  version: 'fd7f355',
 };
 
 function persistTimetables() { Store.setTimetables(AppState.timetables); }
 function persistSettings() { Store.setSettings(AppState.settings); }
+
+async function loadGitHubVersion() {
+  try {
+    const res = await fetch('https://api.github.com/repos/taherms/jmm-bell-commander/commits/main', {
+      headers: { Accept: 'application/vnd.github+json' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return;
+    const commit = await res.json();
+    if (commit.sha) AppState.version = commit.sha.slice(0, 7);
+  } catch {
+    // Keep the last committed fallback when GitHub is unavailable offline.
+  }
+}
 
 function allRingOptions() {
   const opts = [];
@@ -483,7 +498,7 @@ function renderSettings() {
     </div>
 
     <div class="about-block">
-      JMM Bell Commander · runs entirely in this browser · v1.0
+      JMM Bell Commander · GitHub commit ${AppState.version}
     </div>
   `;
 
@@ -997,6 +1012,7 @@ async function boot() {
   await loadInitialSetup();
   await loadDefaultRings();
   await loadCustomRingsMeta();
+  await loadGitHubVersion();
   if (AppState.settings.wakeLockPreferred) requestWakeLock();
   switchTab('now');
   startScheduler();
