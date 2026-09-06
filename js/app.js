@@ -192,7 +192,7 @@ function renderNow() {
     </div>
 
     <div class="quick-actions">
-      ${!AppState.audioUnlocked ? `<button class="btn btn--gold" data-action="enable-sound">🔔 Enable Sound · Test</button>` : `<span class="pill pill--ok">🔔 Sound enabled</span>`}
+      ${!AppState.audioUnlocked ? `<button class="btn btn--gold" data-action="enable-sound">🔔 Enable Sound · Test</button>` : `<span class="btn btn--gold pill0 pill--ok0">🔔 Sound enabled</span>`}
       <button class="btn ${AppState.wakeLockObj ? 'btn--status-on' : 'btn--outline'}" data-action="toggle-wakelock">${AppState.wakeLockObj ? '💡 Screen Awake · On' : '🌙 Keep Screen Awake · Off'}</button>
       <button class="btn btn--outline" data-action="toggle-pause">${Scheduler.isPaused() ? '▶ Resume Schedule' : '⏸ Pause Schedule'}</button>
       <button class="btn btn--outline" data-action="skip-next">⏭ Skip Next Bell</button>
