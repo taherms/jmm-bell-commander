@@ -55,6 +55,7 @@ const AppState = {
   wakeLockObj: null,
   currentTickInfo: null,
   version: 'fd7f355',
+  nowInteractionUntil: 0,
 };
 
 function persistTimetables() { Store.setTimetables(AppState.timetables); }
@@ -433,17 +434,23 @@ function renderRings() {
 }
 
 async function handleRingUpload() {
-  const fileInput = document.getElementById('ring-upload-input');
-  const nameInput = document.getElementById('ring-upload-name');
-  const file = fileInput.files[0];
-  if (!file) { Utils.toast('Choose an audio file first', 'warn'); return; }
-  const id = Utils.uuid();
-  const name = nameInput.value.trim() || file.name.replace(/\.[^.]+$/, '');
-  const record = { id, name, mimeType: file.type || 'audio/mpeg', blob: file, createdAt: Date.now() };
-  await RingsDB.put(record);
-  AppState.customRings.push({ id, name, mimeType: record.mimeType, createdAt: record.createdAt });
-  Utils.toast(`Added ring: ${name}`, 'ok');
-  renderRings();
+  try {
+    const fileInput = document.getElementById('ring-upload-input');
+    const nameInput = document.getElementById('ring-upload-name');
+    const file = fileInput?.files?.[0];
+    if (!file) { Utils.toast('Choose an audio file first', 'warn'); return; }
+    if (!file.type.startsWith('audio/')) { Utils.toast('Choose an audio file', 'warn'); return; }
+    const id = Utils.uuid();
+    const name = nameInput.value.trim() || file.name.replace(/\.[^.]+$/, '');
+    const record = { id, name, mimeType: file.type || 'audio/mpeg', blob: file, createdAt: Date.now() };
+    await RingsDB.put(record);
+    AppState.customRings.push({ id, name, mimeType: record.mimeType, createdAt: record.createdAt });
+    Utils.toast(`Added ring: ${name}`, 'ok');
+    renderRings();
+  } catch (err) {
+    console.error('Could not upload ring', err);
+    Utils.toast(err?.message || 'Could not save this audio file', 'warn');
+  }
 }
 
 /* ============================== SETTINGS TAB ============================== */
@@ -621,7 +628,7 @@ async function importData(mode) {
     renderActiveTab();
   } catch (err) {
     console.error(err);
-    Utils.toast(err.message || 'Could not import this backup file', 'warn');
+    Utils.toast(err?.message || 'Could not import this backup file', 'warn');
   }
 }
 
@@ -655,12 +662,30 @@ document.addEventListener('visibilitychange', () => {
 
 /* ============================== EVENT DELEGATION ============================== */
 
+function holdNowInteraction() {
+  AppState.nowInteractionUntil = Date.now() + 1200;
+}
+
+function isNowInteracting() {
+  const active = document.activeElement;
+  return Date.now() < AppState.nowInteractionUntil
+    || !!active?.matches('button, input, select, textarea') && !!active.closest('#screen-now');
+}
+
+document.addEventListener('pointerdown', (e) => {
+  if (AppState.activeTab === 'now' && e.target.closest('#screen-now')) holdNowInteraction();
+}, true);
+document.addEventListener('focusin', (e) => {
+  if (AppState.activeTab === 'now' && e.target.closest('#screen-now')) holdNowInteraction();
+}, true);
+
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
   const action = btn.dataset.action;
 
-  switch (action) {
+  try {
+    switch (action) {
     case 'enable-sound': {
       await Scheduler.unlockAudio();
       AppState.audioUnlocked = true;
@@ -850,6 +875,10 @@ document.addEventListener('click', async (e) => {
       renderActiveTab();
       break;
     }
+    }
+  } catch (err) {
+    console.error(`Action failed: ${action}`, err);
+    Utils.toast(err?.message || 'That action could not be completed', 'warn');
   }
 });
 
@@ -984,7 +1013,7 @@ function startScheduler() {
       // and this keeps the active timetable, next-bell countdown and each
       // bell's Rung/Pending status correct without extra bookkeeping.
       // Keep the timetable selector stable while it is being used.
-      if (AppState.activeTab === 'now' && document.activeElement?.id !== 'override-select') renderNow();
+      if (AppState.activeTab === 'now' && !isNowInteracting()) renderNow();
     },
     onBellFire: (bell, timetable) => {
       AppState.firedTodaySet.add(`${Utils.dateToYMD(new Date())}_${bell.id}`);

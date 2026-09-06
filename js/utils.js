@@ -131,7 +131,7 @@ const Utils = (() => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
+      reader.onerror = () => reject(reader.error || new Error('Could not read audio data'));
       reader.readAsDataURL(blob);
     });
   }
@@ -163,7 +163,7 @@ const Utils = (() => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
+      reader.onerror = () => reject(reader.error || new Error('Could not read the selected file'));
       reader.readAsText(file);
     });
   }
