@@ -521,6 +521,50 @@ async function exportAllData() {
   Utils.toast('Backup downloaded', 'ok');
 }
 
+async function readBackupData(file) {
+  const text = await Utils.readFileAsText(file);
+  const data = JSON.parse(text);
+  if (!data || data.app !== 'JMM Bell Commander' || !Array.isArray(data.timetables)) {
+    throw new Error('This is not a valid JMM Bell Commander backup');
+  }
+  if (data.customRings !== undefined && !Array.isArray(data.customRings)) {
+    throw new Error('Backup custom rings are invalid');
+  }
+  for (const timetable of data.timetables) {
+    if (!timetable || !Array.isArray(timetable.bells)) {
+      throw new Error('Backup timetable bells are invalid');
+    }
+  }
+  return data;
+}
+
+async function importCustomRings(rings, mode) {
+  const idMap = new Map();
+  const imported = [];
+  for (const ring of (rings || [])) {
+    if (!ring || typeof ring.name !== 'string' || typeof ring.dataUrl !== 'string') {
+      throw new Error(`Backup audio ring "${ring?.name || 'unknown'}" is invalid`);
+    }
+    const existing = AppState.customRings.find((c) => c.name === ring.name);
+    if (mode === 'merge' && existing) {
+      idMap.set(ring.id, existing.id);
+      continue;
+    }
+    const id = mode === 'replace' ? ring.id : Utils.uuid();
+    const rec = {
+      id,
+      name: ring.name,
+      mimeType: ring.mimeType || 'audio/mpeg',
+      blob: await Utils.dataURLToBlob(ring.dataUrl),
+      createdAt: Date.now(),
+    };
+    if (!rec.blob.size) throw new Error(`Backup audio ring "${ring.name}" is empty`);
+    idMap.set(ring.id, id);
+    imported.push(rec);
+  }
+  return { idMap, imported };
+}
+
 async function importData(mode) {
   const fileInput = document.getElementById('import-file-input');
   const file = fileInput.files[0];
@@ -528,28 +572,30 @@ async function importData(mode) {
   if (mode === 'replace' && !confirm('Replace ALL current timetables and custom rings with the contents of this file? This cannot be undone.')) return;
 
   try {
-    const text = await Utils.readFileAsText(file);
-    const data = JSON.parse(text);
-    if (!data || !Array.isArray(data.timetables)) throw new Error('not a valid backup file');
+    const data = await readBackupData(file);
+    const previousRings = AppState.customRings;
+    const { idMap, imported } = await importCustomRings(data.customRings, mode);
+    const remapRing = (ring) => {
+      if (!ring || ring.source !== 'custom') return ring;
+      return { ...ring, id: idMap.get(ring.id) || ring.id };
+    };
+    const importedTimetables = data.timetables.map((timetable) => ({
+      ...timetable,
+      id: mode === 'replace' ? timetable.id : Utils.uuid(),
+      bells: timetable.bells.map((bell) => ({ ...bell, id: mode === 'replace' ? bell.id : Utils.uuid(), ring: remapRing(bell.ring) })),
+    }));
 
     if (mode === 'replace') {
-      AppState.timetables = data.timetables;
       await RingsDB.clear();
-      AppState.customRings = [];
+      for (const ring of imported) await RingsDB.put(ring);
+      AppState.timetables = importedTimetables;
     } else {
-      const incoming = data.timetables.map((t) => ({ ...t, id: Utils.uuid(), bells: t.bells.map((b) => ({ ...b, id: Utils.uuid() })) }));
-      AppState.timetables = [...AppState.timetables, ...incoming];
+      for (const ring of imported) await RingsDB.put(ring);
+      AppState.timetables = [...AppState.timetables, ...importedTimetables];
     }
-
-    for (const r of (data.customRings || [])) {
-      const existing = AppState.customRings.find((c) => c.name === r.name);
-      if (mode === 'merge' && existing) continue;
-      const blob = await Utils.dataURLToBlob(r.dataUrl);
-      const id = mode === 'replace' ? r.id : Utils.uuid();
-      const rec = { id, name: r.name, mimeType: r.mimeType, blob, createdAt: Date.now() };
-      await RingsDB.put(rec);
-      AppState.customRings.push({ id, name: r.name, mimeType: r.mimeType, createdAt: rec.createdAt });
-    }
+    AppState.customRings = mode === 'replace'
+      ? imported.map(({ id, name, mimeType, createdAt }) => ({ id, name, mimeType, createdAt }))
+      : [...previousRings, ...imported.map(({ id, name, mimeType, createdAt }) => ({ id, name, mimeType, createdAt }))];
 
     if (data.settings) {
       AppState.settings = { ...AppState.settings, ...data.settings };
@@ -560,7 +606,7 @@ async function importData(mode) {
     renderActiveTab();
   } catch (err) {
     console.error(err);
-    Utils.toast('Could not read that file — is it a JMM Bell Commander backup?', 'warn');
+    Utils.toast(err.message || 'Could not import this backup file', 'warn');
   }
 }
 
