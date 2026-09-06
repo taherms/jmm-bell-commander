@@ -56,6 +56,13 @@ const Utils = (() => {
     return Math.round(diff);
   }
 
+  function minutesUntilOccurrence(fromDate, occurrenceDate, hhmm) {
+    const [year, month, day] = occurrenceDate.split('-').map(Number);
+    const [hour, minute] = hhmm.split(':').map(Number);
+    const target = new Date(year, month - 1, day, hour, minute, 0, 0);
+    return Math.max(0, Math.round((target - fromDate) / 60000));
+  }
+
   function humanizeMinutes(mins) {
     if (mins <= 0) return 'now';
     if (mins < 60) return `${mins} min`;
@@ -185,7 +192,7 @@ const Utils = (() => {
   return {
     uuid, pad2, dateToYMD, timeToHHMM, nowLabel, formatTimeLabel,
     WEEKDAY_LABELS, WEEKDAY_LABELS_FULL,
-    minutesUntil, humanizeMinutes, sha256Hex,
+    minutesUntil, minutesUntilOccurrence, humanizeMinutes, sha256Hex,
     blobToDataURL, dataURLToBlob, escapeHtml,
     downloadJSON, readFileAsText, toast,
   };

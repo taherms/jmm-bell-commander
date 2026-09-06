@@ -146,12 +146,24 @@ button, input, select, textarea {
 
 .clock {
   font-family: var(--font-display);
-  font-size: 40px;
-  letter-spacing: 0.5px;
-  padding-top: 18px;
+  font-size: clamp(38px, 7vw, 68px);
+  font-weight: 600;
+  letter-spacing: 1px;
+  line-height: 1;
+  padding-top: 24px;
   color: var(--cream);
+  text-shadow: 0 3px 0 rgba(11, 61, 46, 0.28), 0 8px 22px rgba(0, 0, 0, 0.16);
 }
-.clock-date { font-size: 13px; color: var(--gold-light); margin-top: 2px; }
+.clock-date {
+  font-family: var(--font-display);
+  font-size: clamp(12px, 1.7vw, 16px);
+  font-weight: 400;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold-light);
+  margin-top: 10px;
+  opacity: 0.94;
+}
 
 .screen-title {
   font-family: var(--font-display);
@@ -412,6 +424,33 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
 .date-range-row { display: flex; gap: 10px; margin-top: 4px; }
 .date-range-row > div { flex: 1; }
 
+.date-exception-row,
+.date-exception-add,
+.excluded-date-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.date-exception-row .input,
+.date-exception-add .input,
+.excluded-date-add .input { margin-bottom: 0; }
+.date-exception-add { margin-bottom: 12px; }
+.excluded-date-add { grid-template-columns: minmax(0, 1fr) auto; }
+.excluded-date-list { display: grid; gap: 6px; margin-top: 12px; }
+.excluded-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--cream-dim);
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
 .bell-edit-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
 .input--time { width: 108px; flex-shrink: 0; }
 .input--label { flex: 1; min-width: 0; }
@@ -592,6 +631,9 @@ textarea.input { resize: vertical; font-family: monospace; font-size: 13px; }
   .bell-row__time { width: 64px; font-size: 13px; }
   .bell-row__status { display: none; }
   .btn--tiny { padding-left: 8px; padding-right: 8px; }
+  .date-exception-row,
+  .date-exception-add,
+  .excluded-date-add { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (min-width: 900px) {

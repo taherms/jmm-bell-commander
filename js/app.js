@@ -15,6 +15,7 @@ const Store = (() => {
     wakeLockPreferred: true,
     overrideTimetableId: null,
     overrideDate: null,
+    excludedDates: [],
   };
 
   function getTimetables() {
@@ -135,17 +136,19 @@ function renderNow() {
   const timetable = info ? info.timetable : null;
   const reason = info ? info.reason : 'none';
   const next = info ? info.next : null;
-  AppState.nowViewKey = `${timetable?.id || 'none'}:${reason}:${next?.id || 'none'}`;
+  AppState.nowViewKey = `${timetable?.id || 'none'}:${reason}:${next?.id || 'none'}:${next?.occurrenceDate || ''}`;
 
   const reasonLabel = {
     override: 'Manual override for today',
     dateRange: 'Active — scheduled date range',
     weekday: 'Active — recurring weekday',
+    excluded: 'No bells — excluded date',
     none: 'No timetable scheduled today',
   }[reason];
 
   const bells = timetable ? Scheduler.sortedBells(timetable) : [];
   const todayYMD = Utils.dateToYMD(now);
+  const nextDateLabel = next ? formatNextDateLabel(next.occurrenceDate, todayYMD, now) : '';
 
   el.innerHTML = `
     <div class="arch-header">
@@ -163,7 +166,7 @@ function renderNow() {
         <div>
           <div class="eyebrow-plain">Active timetable</div>
           <div class="hero-title">${timetable ? Utils.escapeHtml(timetable.name) : 'None'}</div>
-          <div class="hero-sub hero-sub--${reason === 'none' ? 'muted' : 'ok'}">${reasonLabel}</div>
+          <div class="hero-sub hero-sub--${reason === 'none' || reason === 'excluded' ? 'muted' : 'ok'}">${Scheduler.isPaused() ? 'Schedule paused' : reasonLabel}</div>
         </div>
         <span class="tag tag--${timetable ? timetable.colorTag : 'muted'}">${timetable ? Utils.WEEKDAY_LABELS[now.getDay()] : ''}</span>
       </div>
@@ -174,8 +177,9 @@ function renderNow() {
         <div>
           <div class="eyebrow-plain">Next bell</div>
           <div class="hero-title hero-title--sm">${next ? `${Utils.escapeHtml(next.label)} · ${Utils.formatTimeLabel(next.time)}` : '—'}</div>
+          ${next ? `<div class="hero-sub hero-sub--muted">${nextDateLabel}</div>` : ''}
         </div>
-        <div class="hero-countdown" id="next-bell-countdown">${next ? Utils.humanizeMinutes(Utils.minutesUntil(now, next.time)) : ''}</div>
+        <div class="hero-countdown" id="next-bell-countdown">${next ? Utils.humanizeMinutes(Utils.minutesUntilOccurrence(now, next.occurrenceDate, next.time)) : ''}</div>
       </div>
 
       <div class="override-row">
@@ -190,6 +194,10 @@ function renderNow() {
     <div class="quick-actions">
       ${!AppState.audioUnlocked ? `<button class="btn btn--gold" data-action="enable-sound">🔔 Enable Sound</button>` : `<span class="pill pill--ok">Sound enabled ✓</span>`}
       <button class="btn btn--outline" data-action="toggle-wakelock">${AppState.wakeLockObj ? '💡 Screen Lock: On' : '🌙 Screen Lock: Off'}</button>
+      <button class="btn btn--outline" data-action="toggle-pause">${Scheduler.isPaused() ? '▶ Resume Schedule' : '⏸ Pause Schedule'}</button>
+      <button class="btn btn--outline" data-action="skip-next">⏭ Skip Next Bell</button>
+      <button class="btn btn--outline btn--danger" data-action="stop-ringing">⏹ Stop Ringing</button>
+      <button class="btn btn--outline" data-action="test-volume">🔊 Test Volume</button>
     </div>
 
     <div class="section-title">Today's bells</div>
@@ -205,6 +213,7 @@ function renderNow() {
               <div class="bell-row__ring">${Utils.escapeHtml(ringName(b.ring))}</div>
             </div>
             <div class="bell-row__status">${fired ? '<span class="pill pill--ok">Rung</span>' : (b.enabled ? '<span class="pill">Pending</span>' : '<span class="pill pill--muted">Off</span>')}</div>
+            <button class="btn btn--tiny" data-action="ring-now" data-source="${b.ring?.source || ''}" data-id="${b.ring?.id || ''}">🔔 Ring now</button>
             <button class="btn btn--tiny" data-action="test-bell" data-source="${b.ring?.source || ''}" data-id="${b.ring?.id || ''}">Test</button>
           </div>`;
         }).join('')}
@@ -222,12 +231,23 @@ function renderNow() {
   `;
 }
 
+function formatNextDateLabel(occurrenceDate, todayYMD, now) {
+  if (occurrenceDate === todayYMD) return 'Today';
+  const tomorrow = new Date(now);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (occurrenceDate === Utils.dateToYMD(tomorrow)) return 'Tomorrow';
+  const [year, month, day] = occurrenceDate.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
 function updateNowLive(info) {
   const clock = document.getElementById('clock-display');
   const countdown = document.getElementById('next-bell-countdown');
   if (clock) clock.textContent = Utils.nowLabel(info.now);
   if (countdown) countdown.textContent = info.next
-    ? Utils.humanizeMinutes(Utils.minutesUntil(info.now, info.next.time))
+    ? Utils.humanizeMinutes(Utils.minutesUntilOccurrence(info.now, info.next.occurrenceDate, info.next.time))
     : '';
 }
 
@@ -318,6 +338,19 @@ function bellRowHtml(bell) {
   `;
 }
 
+function exceptionRowHtml(exception = {}) {
+  return `
+    <div class="date-exception-row" data-date="${exception.date || ''}" data-mode="${exception.mode || 'exclude'}">
+      <input type="date" class="input" data-field="exception-date" value="${exception.date || ''}" />
+      <select class="input" data-field="exception-mode">
+        <option value="exclude" ${exception.mode !== 'include' ? 'selected' : ''}>Exclude this date</option>
+        <option value="include" ${exception.mode === 'include' ? 'selected' : ''}>Include this date</option>
+      </select>
+      <button type="button" class="btn btn--icon btn--danger" data-action="remove-date-exception">✕</button>
+    </div>
+  `;
+}
+
 function openTimetableEditor(timetable) {
   const isNew = !timetable;
   const t = timetable ? JSON.parse(JSON.stringify(timetable)) : newTimetableSkeleton();
@@ -365,6 +398,20 @@ function openTimetableEditor(timetable) {
             <input type="date" class="input" id="tt-end" value="${t.assignment.type === 'dateRange' ? t.assignment.end : ''}" />
           </div>
         </div>
+      </div>
+
+      <label class="field-label">Date exceptions</label>
+      <p class="hint-text">Exclude a normal day or include a special date for this timetable.</p>
+      <div id="tt-exceptions">
+        ${(t.assignment.exceptions || []).map(exceptionRowHtml).join('')}
+      </div>
+      <div class="date-exception-add">
+        <input type="date" class="input" id="tt-exception-date" />
+        <select class="input" id="tt-exception-mode">
+          <option value="exclude">Exclude this date</option>
+          <option value="include">Include this date</option>
+        </select>
+        <button type="button" class="btn btn--outline" data-action="add-date-exception">Add date</button>
       </div>
 
       <label class="field-label">Bells</label>
@@ -492,6 +539,20 @@ function renderSettings() {
       <div class="import-btn-row">
         <button class="btn btn--outline btn--block" data-action="import-merge">Merge into existing</button>
         <button class="btn btn--outline btn--danger btn--block" data-action="import-replace">Replace all data</button>
+      </div>
+    </div>
+
+    <div class="section-title">Holidays and closures</div>
+    <div class="card">
+      <p class="hint-text">These dates disable every timetable for the whole station.</p>
+      <div class="excluded-date-add">
+        <input type="date" id="excluded-date-input" class="input" />
+        <button class="btn btn--outline" data-action="add-excluded-date">Add closure</button>
+      </div>
+      <div class="excluded-date-list">
+        ${(AppState.settings.excludedDates || []).map((date) => `
+          <div class="excluded-date-row"><span>${date}</span><button class="btn btn--tiny" data-action="remove-excluded-date" data-date="${date}">Remove</button></div>
+        `).join('') || '<div class="hint-text">No closure dates added.</div>'}
       </div>
     </div>
 
@@ -715,6 +776,35 @@ document.addEventListener('click', async (e) => {
       await Scheduler.previewRing({ source, id }, AppState.defaultRings, AppState.settings.volume);
       break;
     }
+    case 'ring-now': {
+      const source = btn.dataset.source, id = btn.dataset.id;
+      if (!source || !id) { Utils.toast('This bell has no ring set', 'warn'); break; }
+      const ok = await Scheduler.ringNow({ source, id }, AppState.defaultRings);
+      Utils.toast(ok ? 'Bell ringing now' : 'Could not load this ring', ok ? 'ok' : 'warn');
+      break;
+    }
+    case 'test-volume': {
+      const ring = AppState.currentTickInfo?.next?.ring || AppState.defaultRings[0] && { source: 'default', id: AppState.defaultRings[0].id };
+      if (!ring) { Utils.toast('Add a ring before testing volume', 'warn'); break; }
+      await Scheduler.testVolume(ring, AppState.defaultRings, AppState.settings.volume);
+      break;
+    }
+    case 'toggle-pause': {
+      Scheduler.setPaused(!Scheduler.isPaused());
+      renderNow();
+      Utils.toast(Scheduler.isPaused() ? 'Schedule paused' : 'Schedule resumed', 'ok');
+      break;
+    }
+    case 'skip-next': {
+      if (!Scheduler.skipNextBell()) { Utils.toast('There is no next bell to skip', 'warn'); break; }
+      renderNow();
+      Utils.toast('Next bell skipped', 'ok');
+      break;
+    }
+    case 'stop-ringing':
+      Scheduler.stopRinging();
+      Utils.toast('Ringing stopped', 'ok');
+      break;
     case 'new-timetable': openTimetableEditor(null); break;
     case 'edit-timetable': openTimetableEditor(AppState.timetables.find((t) => t.id === btn.dataset.id)); break;
     case 'duplicate-timetable': {
@@ -760,6 +850,18 @@ document.addEventListener('click', async (e) => {
       break;
     }
     case 'toggle-weekday': btn.classList.toggle('is-selected'); break;
+    case 'add-date-exception': {
+      const dateInput = document.getElementById('tt-exception-date');
+      if (!dateInput.value) { Utils.toast('Choose an exception date', 'warn'); break; }
+      const row = document.createElement('div');
+      row.innerHTML = exceptionRowHtml({ date: dateInput.value, mode: document.getElementById('tt-exception-mode').value });
+      document.getElementById('tt-exceptions').appendChild(row.firstElementChild);
+      dateInput.value = '';
+      break;
+    }
+    case 'remove-date-exception':
+      btn.closest('.date-exception-row')?.remove();
+      break;
     case 'add-bell-row': {
       const container = document.getElementById('bell-rows');
       const div = document.createElement('div');
@@ -789,6 +891,10 @@ document.addEventListener('click', async (e) => {
         if (!start || !end) { Utils.toast('Set both a start and end date', 'warn'); break; }
         assignment = { type: 'dateRange', start, end };
       }
+      assignment.exceptions = Array.from(document.querySelectorAll('.date-exception-row')).map((row) => ({
+        date: row.querySelector('[data-field="exception-date"]').value,
+        mode: row.querySelector('[data-field="exception-mode"]').value,
+      })).filter((item) => item.date);
       const bells = collectBellRows();
       const existingIdx = AppState.timetables.findIndex((t) => t.id === id);
       const record = { id, name, colorTag, assignment, bells };
@@ -847,6 +953,20 @@ document.addEventListener('click', async (e) => {
       renderSettings();
       break;
     }
+    case 'add-excluded-date': {
+      const input = document.getElementById('excluded-date-input');
+      if (!input.value) { Utils.toast('Choose a closure date', 'warn'); break; }
+      AppState.settings.excludedDates = [...new Set([...(AppState.settings.excludedDates || []), input.value])].sort();
+      persistSettings();
+      renderSettings();
+      Utils.toast('Closure date added', 'ok');
+      break;
+    }
+    case 'remove-excluded-date':
+      AppState.settings.excludedDates = (AppState.settings.excludedDates || []).filter((date) => date !== btn.dataset.date);
+      persistSettings();
+      renderSettings();
+      break;
     case 'save-password-everyone': {
       const val = document.getElementById('new-password-input').value;
       if (!val || val.length < 4) { Utils.toast('Password should be at least 4 characters', 'warn'); break; }
@@ -1019,7 +1139,7 @@ function startScheduler() {
     getSettings: () => AppState.settings,
     getDefaultRings: () => AppState.defaultRings,
     onTick: (info) => {
-      const viewKey = `${info.timetable?.id || 'none'}:${info.reason}:${info.next?.id || 'none'}`;
+      const viewKey = `${info.timetable?.id || 'none'}:${info.reason}:${info.next?.id || 'none'}:${info.next?.occurrenceDate || ''}`;
       AppState.currentTickInfo = info;
       if (AppState.activeTab !== 'now') return;
       if (viewKey !== AppState.nowViewKey && !isNowInteracting()) renderNow();

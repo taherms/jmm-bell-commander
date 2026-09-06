@@ -11,12 +11,17 @@ const Scheduler = (() => {
   let firedToday = new Set();
   let firedForYMD = null;
   let callbacks = {};
+  let paused = false;
+  let skippedKeys = new Set();
+  let lastTickInfo = null;
   const ringSrcCache = new Map(); // ringKey -> resolved src (object URL or path)
 
   /* ---------------- active timetable resolution ---------------- */
 
   function matchesDate(t, dateObj) {
     const ymd = Utils.dateToYMD(dateObj);
+    const exception = (t.assignment.exceptions || []).find((item) => item.date === ymd);
+    if (exception) return exception.mode === 'include';
     if (t.assignment.type === 'dateRange') {
       return ymd >= t.assignment.start && ymd <= t.assignment.end;
     }
@@ -38,6 +43,10 @@ const Scheduler = (() => {
    */
   function computeActiveTimetable(dateObj, timetables, settings) {
     const ymd = Utils.dateToYMD(dateObj);
+
+    if ((settings.excludedDates || []).includes(ymd)) {
+      return { timetable: null, reason: 'excluded' };
+    }
 
     if (settings.overrideDate === ymd && settings.overrideTimetableId) {
       const t = timetables.find((tt) => tt.id === settings.overrideTimetableId);
@@ -72,6 +81,26 @@ const Scheduler = (() => {
     }
     if (!best) best = bells[0]; // wraps to first bell tomorrow
     return best;
+  }
+
+  function nextScheduledBell(dateObj, timetables, settings) {
+    for (let offset = 0; offset <= 366; offset += 1) {
+      const candidateDate = new Date(dateObj);
+      candidateDate.setDate(candidateDate.getDate() + offset);
+      const active = computeActiveTimetable(candidateDate, timetables, settings);
+      const minimumTime = offset === 0 ? Utils.timeToHHMM(dateObj) : '00:00';
+      const bell = sortedBells(active.timetable)
+        .filter((item) => item.enabled && item.time >= minimumTime)[0];
+      if (bell) {
+        return {
+          ...bell,
+          occurrenceDate: Utils.dateToYMD(candidateDate),
+          timetable: active.timetable,
+          reason: active.reason,
+        };
+      }
+    }
+    return null;
   }
 
   /* ---------------- ring source resolution ---------------- */
@@ -117,6 +146,19 @@ const Scheduler = (() => {
     audioEl.volume = Math.max(0, Math.min(1, v));
   }
 
+  function setPaused(value) { paused = Boolean(value); }
+  function isPaused() { return paused; }
+  function skipNextBell() {
+    if (!lastTickInfo?.next) return false;
+    skippedKeys.add(`${lastTickInfo.next.occurrenceDate}_${lastTickInfo.next.id}`);
+    return true;
+  }
+  function stopRinging() {
+    queue = [];
+    audioEl.pause();
+    audioEl.currentTime = 0;
+  }
+
   function playNextInQueue() {
     if (!queue.length) { playing = false; return; }
     playing = true;
@@ -149,6 +191,14 @@ const Scheduler = (() => {
     preview.volume = audioEl.volume;
     await preview.play();
     return true;
+  }
+
+  async function ringNow(ring, defaultRings) {
+    return enqueueRing(ring, defaultRings);
+  }
+
+  async function testVolume(ring, defaultRings, volume) {
+    return previewRing(ring, defaultRings, volume);
   }
 
   function unlockAudio() {
@@ -188,9 +238,12 @@ const Scheduler = (() => {
     const settings = callbacks.getSettings();
     const defaultRings = callbacks.getDefaultRings();
     const { timetable, reason } = computeActiveTimetable(now, timetables, settings);
-    const next = nextBell(timetable, now);
+    const next = nextScheduledBell(now, timetables, settings);
+    lastTickInfo = { now, timetable, reason, next };
 
-    callbacks.onTick && callbacks.onTick({ now, timetable, reason, next });
+    callbacks.onTick && callbacks.onTick({ now, timetable, reason, next, paused });
+
+    if (paused) return;
 
     if (timetable) {
       const hhmm = Utils.timeToHHMM(now);
@@ -199,6 +252,11 @@ const Scheduler = (() => {
         if (bell.time !== hhmm) continue;
         const key = `${ymd}_${bell.id}`;
         if (firedToday.has(key)) continue;
+        if (skippedKeys.delete(key)) {
+          firedToday.add(key);
+          callbacks.onBellSkip && callbacks.onBellSkip(bell, timetable);
+          continue;
+        }
         firedToday.add(key);
         enqueueRing(bell.ring, defaultRings);
         callbacks.onBellFire && callbacks.onBellFire(bell, timetable);
@@ -207,8 +265,9 @@ const Scheduler = (() => {
   }
 
   return {
-    computeActiveTimetable, sortedBells, nextBell,
-    start, stop, setVolume, unlockAudio,
+    computeActiveTimetable, sortedBells, nextBell, nextScheduledBell,
+    start, stop, setVolume, unlockAudio, setPaused, isPaused,
+    skipNextBell, stopRinging, ringNow, testVolume,
     enqueueRing, previewRing, invalidateRingCache,
   };
 })();

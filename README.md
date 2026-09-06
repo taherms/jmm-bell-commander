@@ -65,7 +65,16 @@ To change it, go to **Settings → Shared login password**:
 - On the **Now** tab, "Today's timetable" can be manually overridden for a
   single day (e.g. an unplanned holiday) — it resets back to Auto the next
   day on its own.
+- Use **Pause Schedule**, **Skip Next Bell**, **Stop Ringing**, **Ring now**,
+  and **Test Volume** on the Now tab for station-side control.
 - Each bell has its own time, label, and ring sound.
+
+### Holidays and timetable exceptions
+
+- Add station-wide closure dates under **Settings → Holidays and closures**.
+  No timetable rings on those dates.
+- In a timetable editor, add date exceptions to exclude a normally scheduled
+  date or include a special date outside its normal weekday/date-range rule.
 
 ## Rings (bell sounds)
 

@@ -5,7 +5,7 @@
    file so devices pick up the update.
    ========================================================================== */
 
-const CACHE_VERSION = 'jmm-bell-commander-v2';
+const CACHE_VERSION = 'jmm-bell-commander-v4';
 
 const APP_SHELL = [
   './',
