@@ -56,6 +56,7 @@ const AppState = {
   currentTickInfo: null,
   version: 'fd7f355',
   nowInteractionUntil: 0,
+  nowViewKey: '',
 };
 
 function persistTimetables() { Store.setTimetables(AppState.timetables); }
@@ -134,6 +135,7 @@ function renderNow() {
   const timetable = info ? info.timetable : null;
   const reason = info ? info.reason : 'none';
   const next = info ? info.next : null;
+  AppState.nowViewKey = `${timetable?.id || 'none'}:${reason}:${next?.id || 'none'}`;
 
   const reasonLabel = {
     override: 'Manual override for today',
@@ -173,7 +175,7 @@ function renderNow() {
           <div class="eyebrow-plain">Next bell</div>
           <div class="hero-title hero-title--sm">${next ? `${Utils.escapeHtml(next.label)} · ${Utils.formatTimeLabel(next.time)}` : '—'}</div>
         </div>
-        <div class="hero-countdown">${next ? Utils.humanizeMinutes(Utils.minutesUntil(now, next.time)) : ''}</div>
+        <div class="hero-countdown" id="next-bell-countdown">${next ? Utils.humanizeMinutes(Utils.minutesUntil(now, next.time)) : ''}</div>
       </div>
 
       <div class="override-row">
@@ -218,6 +220,15 @@ function renderNow() {
       </div>
     ` : ''}
   `;
+}
+
+function updateNowLive(info) {
+  const clock = document.getElementById('clock-display');
+  const countdown = document.getElementById('next-bell-countdown');
+  if (clock) clock.textContent = Utils.nowLabel(info.now);
+  if (countdown) countdown.textContent = info.next
+    ? Utils.humanizeMinutes(Utils.minutesUntil(info.now, info.next.time))
+    : '';
 }
 
 /* ========================== TIMETABLES TAB ========================== */
@@ -1008,12 +1019,11 @@ function startScheduler() {
     getSettings: () => AppState.settings,
     getDefaultRings: () => AppState.defaultRings,
     onTick: (info) => {
+      const viewKey = `${info.timetable?.id || 'none'}:${info.reason}:${info.next?.id || 'none'}`;
       AppState.currentTickInfo = info;
-      // Re-render the whole Now screen each second: it's a small DOM tree,
-      // and this keeps the active timetable, next-bell countdown and each
-      // bell's Rung/Pending status correct without extra bookkeeping.
-      // Keep the timetable selector stable while it is being used.
-      if (AppState.activeTab === 'now' && !isNowInteracting()) renderNow();
+      if (AppState.activeTab !== 'now') return;
+      if (viewKey !== AppState.nowViewKey && !isNowInteracting()) renderNow();
+      else updateNowLive(info);
     },
     onBellFire: (bell, timetable) => {
       AppState.firedTodaySet.add(`${Utils.dateToYMD(new Date())}_${bell.id}`);
