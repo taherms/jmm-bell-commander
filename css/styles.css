@@ -258,6 +258,7 @@ button, input, select, textarea {
 }
 .btn:active:not(:disabled) { transform: translateY(0); }
 .btn--gold { background: var(--gold); color: var(--ink); }
+.btn--status-on { background: var(--emerald-soft); color: var(--emerald-dark); border: 1.5px solid var(--emerald); }
 .btn--outline { background: #fff; border: 1.5px solid var(--emerald); color: var(--emerald-dark); }
 .btn--danger.btn--outline { border-color: var(--maroon);}
 .btn--danger { background: var(--maroon); color: #fff; }

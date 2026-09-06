@@ -202,13 +202,25 @@ const Scheduler = (() => {
   }
 
   function unlockAudio() {
-    // Play a near-silent blip synchronously within a user gesture to
-    // satisfy iOS/Safari/Chrome autoplay-unlock requirements for this
-    // page session.
-    const el = new Audio();
-    el.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-    el.volume = 0.0001;
-    return el.play().catch(() => {});
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return Promise.resolve(false);
+      const context = new AudioContextClass();
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      oscillator.type = 'sine';
+      oscillator.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.28);
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start();
+      oscillator.stop(context.currentTime + 0.3);
+      oscillator.addEventListener('ended', () => context.close());
+      return Promise.resolve(true);
+    } catch {
+      return Promise.resolve(false);
+    }
   }
 
   /* ---------------- tick loop ---------------- */

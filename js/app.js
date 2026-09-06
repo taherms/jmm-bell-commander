@@ -192,8 +192,8 @@ function renderNow() {
     </div>
 
     <div class="quick-actions">
-      ${!AppState.audioUnlocked ? `<button class="btn btn--gold" data-action="enable-sound">🔔 Enable Sound</button>` : `<span class="pill pill--ok">Sound enabled ✓</span>`}
-      <button class="btn btn--outline" data-action="toggle-wakelock">${AppState.wakeLockObj ? '💡 Screen Lock: On' : '🌙 Screen Lock: Off'}</button>
+      ${!AppState.audioUnlocked ? `<button class="btn btn--gold" data-action="enable-sound">🔔 Enable Sound · Test</button>` : `<span class="pill pill--ok">🔔 Sound enabled</span>`}
+      <button class="btn ${AppState.wakeLockObj ? 'btn--status-on' : 'btn--outline'}" data-action="toggle-wakelock">${AppState.wakeLockObj ? '💡 Screen Awake · On' : '🌙 Keep Screen Awake · Off'}</button>
       <button class="btn btn--outline" data-action="toggle-pause">${Scheduler.isPaused() ? '▶ Resume Schedule' : '⏸ Pause Schedule'}</button>
       <button class="btn btn--outline" data-action="skip-next">⏭ Skip Next Bell</button>
       <button class="btn btn--outline btn--danger" data-action="stop-ringing">⏹ Stop Ringing</button>
@@ -707,7 +707,7 @@ async function importData(mode) {
 /* ============================== WAKE LOCK ============================== */
 
 async function requestWakeLock() {
-  if (!('wakeLock' in navigator)) return;
+  if (!('wakeLock' in navigator)) return false;
   try {
     AppState.wakeLockObj = await navigator.wakeLock.request('screen');
     AppState.wakeLockObj.addEventListener('release', () => {
@@ -715,8 +715,10 @@ async function requestWakeLock() {
       if (AppState.activeTab === 'now') renderNow();
     });
     if (AppState.activeTab === 'now') renderNow();
+    return true;
   } catch (e) {
     AppState.wakeLockObj = null;
+    return false;
   }
 }
 function releaseWakeLock() {
@@ -759,15 +761,25 @@ document.addEventListener('click', async (e) => {
   try {
     switch (action) {
     case 'enable-sound': {
-      await Scheduler.unlockAudio();
+      const unlocked = await Scheduler.unlockAudio();
+      if (!unlocked) {
+        Utils.toast('Sound could not be enabled. Check browser audio permissions.', 'warn');
+        break;
+      }
       AppState.audioUnlocked = true;
       AppState.audioBlockedBanner = false;
-      Utils.toast('Sound enabled for this session', 'ok');
+      Utils.toast('Sound enabled — you should hear a test tone', 'ok');
       renderNow();
       break;
     }
     case 'toggle-wakelock': {
-      if (AppState.wakeLockObj) releaseWakeLock(); else await requestWakeLock();
+      if (AppState.wakeLockObj) {
+        releaseWakeLock();
+        Utils.toast('Screen wake lock turned off', 'ok');
+      } else {
+        const requested = await requestWakeLock();
+        Utils.toast(requested ? 'Screen will stay awake' : 'Screen Lock is not supported by this browser', requested ? 'ok' : 'warn');
+      }
       break;
     }
     case 'test-bell': {
